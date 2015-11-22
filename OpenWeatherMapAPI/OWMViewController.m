@@ -34,7 +34,7 @@
     
     _forecast = @[];
     
-    _weatherAPI = [[OWMWeatherAPI alloc] initWithAPIKey:@"1111111111"]; // Replace the key with your own
+    _weatherAPI = [[OWMWeatherAPI alloc] initWithAPIKey:@"2de143494c0b295cca9337e1e96b00e0"]; // Replace the key with your own
     
     // We want localized strings according to the prefered system language
     [_weatherAPI setLangWithPreferedLanguage];
@@ -44,7 +44,7 @@
 
     [self.activityIndicator startAnimating];
     
-    [_weatherAPI currentWeatherByCityName:@"Odense" withCallback:^(NSError *error, NSDictionary *result) {
+    [_weatherAPI currentWeatherByCityName:@"BeiJing" withCallback:^(NSError *error, NSDictionary *result) {
         downloadCount++;
         if (downloadCount > 1) [self.activityIndicator stopAnimating];
         

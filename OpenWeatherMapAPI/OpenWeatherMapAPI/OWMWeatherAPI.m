@@ -7,18 +7,19 @@
 //
 
 #import "OWMWeatherAPI.h"
-#import "AFJSONRequestOperation.h"
+#import <AFHTTPRequestOperationManager.h>
 
 @interface OWMWeatherAPI () {
     NSString *_baseURL;
     NSString *_apiKey;
     NSString *_apiVersion;
-    NSOperationQueue *_weatherQueue;
     
     NSString *_lang;
     
     OWMTemperature _currentTemperatureFormat;
 }
+
+@property (nonatomic,strong) AFHTTPRequestOperationManager *requestOperationManager;
 
 @end
 
@@ -31,11 +32,10 @@
         _apiKey  = apiKey;
         _apiVersion = @"2.5";
         
-        _weatherQueue = [[NSOperationQueue alloc] init];
-        _weatherQueue.name = @"OMWWeatherQueue";
-        
         _currentTemperatureFormat = kOWMTempCelcius;
         
+        _requestOperationManager = [AFHTTPRequestOperationManager manager];
+        [[AFNetworkReachabilityManager sharedManager] startMonitoring];
     }
     return self;
 }
@@ -135,7 +135,7 @@
 - (void) callMethod:(NSString *) method withCallback:( void (^)( NSError* error, NSDictionary *result ) )callback
 {
     
-    NSOperationQueue *callerQueue = [NSOperationQueue currentQueue];
+//    NSOperationQueue *callerQueue = [NSOperationQueue currentQueue];
     
     // build the lang paramter
     NSString *langString;
@@ -147,28 +147,50 @@
     
     NSString *urlString = [NSString stringWithFormat:@"%@%@%@&APPID=%@%@", _baseURL, _apiVersion, method, _apiKey, langString];
     
-    NSURL *url = [NSURL URLWithString:urlString];
+    void (^successBlock)(AFHTTPRequestOperation * __unused task, id responseObject)=^(AFHTTPRequestOperation * __unused task, id responseObject){
+        NSLog(@"request:%@  \n returnData : %@",task.request.URL, responseObject);
+        // 如果是xml或者json格式
+        if([responseObject isKindOfClass:[NSDictionary class]]){
+
+            NSDictionary *res = [self convertResult:responseObject];
+                callback(nil, res);
+        }else {
+            if (callback){
+                callback(responseObject, nil);
+            }
+        }
+    };
     
-    NSURLRequest *request = [NSURLRequest requestWithURL:url];
+    void (^failureBlock)(AFHTTPRequestOperation *__unused task, NSError *error) = ^(AFHTTPRequestOperation *__unused task, NSError *error) {
+        NSLog(@"error request:%@",task.request.URL);
+    };
     
-    AFJSONRequestOperation *operation = [AFJSONRequestOperation JSONRequestOperationWithRequest:request success:^(NSURLRequest *request, NSHTTPURLResponse *response, id JSON) {
-
-        // callback on the caller queue
-        NSDictionary *res = [self convertResult:JSON];
-        [callerQueue addOperationWithBlock:^{
-            callback(nil, res);
-        }];
-
-        
-    } failure:^(NSURLRequest *request, NSHTTPURLResponse *response, NSError *error, id JSON) {
-
-        // callback on the caller queue
-        [callerQueue addOperationWithBlock:^{
-            callback(error, nil);
-        }];
-        
-    }];
-    [_weatherQueue addOperation:operation];
+    self.requestOperationManager.responseSerializer = [AFJSONResponseSerializer serializer];
+    self.requestOperationManager.responseSerializer.acceptableContentTypes = [self.requestOperationManager.responseSerializer.acceptableContentTypes setByAddingObjectsFromArray:[NSArray arrayWithObjects:@"text/plain", @"application/json", nil]];
+    
+    [self.requestOperationManager GET:urlString parameters:nil success:successBlock failure:failureBlock];
+    
+    
+    
+//    AFJSONRequestSerializer *operation = [AFJSONRequestOperation JSONRequestOperationWithRequest:request success:^(NSURLRequest *request, NSHTTPURLResponse *response, id JSON) {
+//
+//        // callback on the caller queue
+//        NSDictionary *res = [self convertResult:JSON];
+//        [callerQueue addOperationWithBlock:^{
+//            callback(nil, res);
+//        }];
+//
+//        
+//    } failure:^(NSURLRequest *request, NSHTTPURLResponse *response, NSError *error, id JSON) {
+//
+//        // callback on the caller queue
+//        [callerQueue addOperationWithBlock:^{
+//            callback(error, nil);
+//        }];
+//        
+//    }];
+    
+//    [_weatherQueue addOperation:operation];
 }
 
 #pragma mark - public api
